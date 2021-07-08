@@ -1,26 +1,29 @@
-define(function () {
-	return {
+export default {
+  stylePrefix: 'sm-',
 
-		stylePrefix		 : 'sm-',
+  sectors: [],
 
-    // Default sectors, which could include also properties
-    //
-    // Example:
-    // sectors: [{
-    //    name: 'Some sector name',
-    //    properties:[{
-    //        name      : 'Width',
-    //        property  : 'width',
-    //        type      : 'integer',
-    //        units     : ['px','%'],
-    //        defaults  : 'auto',
-    //        min       : 0,
-    //    }],
-    // }]
-		sectors			   : [],
+  // Specify the element to use as a container, string (query) or HTMLElement
+  // With the empty value, nothing will be rendered
+  appendTo: '',
 
-    // Text to show in case no element selected
-    textNoElement  : 'Select an element before using Style Manager',
+  // Hide the property in case it's not stylable for the
+  // selected component (each component has 'stylable' property)
+  hideNotStylable: true,
 
-	};
-});
+  // Highlight changed properties of the selected component
+  highlightChanged: true,
+
+  // Highlight computed properties of the selected component
+  highlightComputed: true,
+
+  // Show computed properties of the selected component, if this value
+  // is set to false, highlightComputed will not take effect
+  showComputed: true,
+
+  // Adds the possibility to clear property value from the target style
+  clearProperties: 0,
+
+  // Properties not to take in account for computed styles
+  avoidComputed: ['width', 'height']
+};

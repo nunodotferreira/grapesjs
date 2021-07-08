@@ -1,35 +1,29 @@
-define(['AssetManager/model/Asset'],
-	function(Asset) {
-	
-		describe('Asset Manager', function() {
-			
-			describe('Asset', function() {
-				it('Object exists', function() {
-					Asset.should.be.exist;
-				});
-				
-				it('Has default values', function() {
-					var obj 	= new Asset({});
-					obj.get('type').should.equal("none");
-					obj.get('src').should.equal("");
-					obj.getExtension().should.be.empty;
-					obj.getFilename().should.be.empty;
-				});
-				
-				it('Test getFilename', function() {
-					var obj 	= new Asset({ type:'image', src: 'ch/eck/t.e.s.t'});
-					obj.getFilename().should.equal('t.e.s.t');
-					var obj 	= new Asset({ type:'image', src: 'ch/eck/1234abc'});
-					obj.getFilename().should.equal('1234abc');
-				});
-				
-				it('Test getExtension', function() {
-					var obj 	= new Asset({ type:'image', src: 'ch/eck/t.e.s.t'});
-					obj.getExtension().should.equal('t');
-					var obj 	= new Asset({ type:'image', src: 'ch/eck/1234abc.'});
-					obj.getExtension().should.equal('');
-				});
-				
-			});
-		});
+import Asset from 'asset_manager/model/Asset';
+
+describe('Asset', () => {
+  test('Object exists', () => {
+    expect(Asset).toBeTruthy();
+  });
+
+  test('Has default values', () => {
+    var obj = new Asset({});
+    expect(obj.get('type')).toBeFalsy();
+    expect(obj.get('src')).toBeFalsy();
+    expect(obj.getExtension()).toBeFalsy();
+    expect(obj.getFilename()).toBeFalsy();
+  });
+
+  test('Test getFilename', () => {
+    var obj = new Asset({ type: 'image', src: 'ch/eck/t.e.s.t' });
+    expect(obj.getFilename()).toEqual('t.e.s.t');
+    var obj = new Asset({ type: 'image', src: 'ch/eck/1234abc' });
+    expect(obj.getFilename()).toEqual('1234abc');
+  });
+
+  test('Test getExtension', () => {
+    var obj = new Asset({ type: 'image', src: 'ch/eck/t.e.s.t' });
+    expect(obj.getExtension()).toEqual('t');
+    var obj = new Asset({ type: 'image', src: 'ch/eck/1234abc.' });
+    expect(obj.getExtension()).toEqual('');
+  });
 });

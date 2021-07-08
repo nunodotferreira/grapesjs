@@ -1,15 +1,9 @@
-define(['backbone'],
-	function(Backbone) {
-		/** 
-		 * @class Modal
-		 * */
-		return Backbone.Model.extend({
-			
-			defaults: {
-				title 		: '',
-				content		: '',
-				open 		: false,
-			}
-		
-        });
-	});
+import Backbone from 'backbone';
+
+export default Backbone.Model.extend({
+  defaults: {
+    title: '',
+    content: '',
+    open: false
+  }
+});

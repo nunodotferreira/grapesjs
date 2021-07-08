@@ -1,96 +1,136 @@
-define(['backbone','require'],
-function(Backbone, require) {
-	/** 
-	 * @class ComponentsView
-	 * */
-	return Backbone.View.extend({
-		
-		initialize: function(o) {
-			this.config			= o.config;
-			this.listenTo( this.collection, 'add', this.addTo );
-			this.listenTo( this.collection, 'reset', this.render );
-		},
-		
-		/**
-		 * Add to collection
-		 * @param	{Object} Model
-		 * 
-		 * @return	void
-		 * */
-		addTo: function(model){
-			var i	= this.collection.indexOf(model);
-			this.addToCollection(model, null, i);
-		},
-		
-		/**
-		 * Add new object to collection
-		 * @param	{Object}	Model
-		 * @param	{Object} 	Fragment collection
-		 * @param	{Integer}	Index of append
-		 * 
-		 * @return 	{Object} 	Object rendered
-		 * */
-		addToCollection: function(model, fragmentEl, index){
-			if(!this.compView)
-				this.compView	=	require('./ComponentView');
-			var fragment	= fragmentEl || null,
-				viewObject	= this.compView;
-			
-			switch(model.get('type')){
-				case 'text':
-					if(!this.compViewText)
-						this.compViewText	=	require('./ComponentTextView');
-					viewObject	= this.compViewText;
-					break;
-				case 'image':
-					if(!this.compViewImage)
-						this.compViewImage	=	require('./ComponentImageView');
-					viewObject	= this.compViewImage;
-					break;
-			}
-			
-			var view 		= new viewObject({ 
-				model 	: model, 
-				config	: this.config,
-			});
-			var rendered	= view.render().el;
-			
-			if(fragment){
-				fragment.appendChild(rendered);
-			}else{
-				var p	= this.$parent;
-				if(typeof index != 'undefined'){
-					var method	= 'before';
-					// If the added model is the last of collection
-					// need to change the logic of append
-					if(p.children().length == index){
-						index--;
-						method	= 'after';
-					}
-					// In case the added is new in the collection index will be -1
-					if(index < 0){
-						p.append(rendered);
-					}else
-						p.children().eq(index)[method](rendered);
-				}else{
-					p.append(rendered);
-				}
-			}
-			
-			return rendered;
-		},
-		
-		render: function($p) {
-			var fragment 	= document.createDocumentFragment();
-			this.$parent	= $p || this.$el;
-			this.$el.empty();
-			this.collection.each(function(model){
-				this.addToCollection(model, fragment);
-			},this);
-			this.$el.append(fragment);
-			
-			return this;
-		}
-		
-	});
+import Backbone from 'backbone';
+import { isUndefined } from 'underscore';
+
+export default Backbone.View.extend({
+  initialize(o) {
+    this.opts = o || {};
+    this.config = o.config || {};
+    this.em = this.config.em;
+    const coll = this.collection;
+    this.listenTo(coll, 'add', this.addTo);
+    this.listenTo(coll, 'reset', this.resetChildren);
+    this.listenTo(coll, 'remove', this.removeChildren);
+  },
+
+  removeChildren(removed, coll, opts = {}) {
+    removed.views.forEach(view => {
+      if (!view) return;
+      const { childrenView, scriptContainer } = view;
+      childrenView && childrenView.stopListening();
+      scriptContainer && scriptContainer.remove();
+      view.remove.apply(view);
+    });
+
+    const inner = removed.components();
+    inner.forEach(it => this.removeChildren(it, coll, opts));
+  },
+
+  /**
+   * Add to collection
+   * @param {Model} model
+   * @param {Collection} coll
+   * @param {Object} opts
+   * @private
+   * */
+  addTo(model, coll = {}, opts = {}) {
+    const em = this.config.em;
+    const i = this.collection.indexOf(model);
+    this.addToCollection(model, null, i);
+
+    if (em && !opts.temporary) {
+      const triggerAdd = model => {
+        em.trigger('component:add', model);
+        model.components().forEach(comp => triggerAdd(comp));
+      };
+      triggerAdd(model);
+    }
+  },
+
+  /**
+   * Add new object to collection
+   * @param  {Object}  Model
+   * @param  {Object}   Fragment collection
+   * @param  {Integer}  Index of append
+   *
+   * @return   {Object}   Object rendered
+   * @private
+   * */
+  addToCollection(model, fragmentEl, index) {
+    if (!this.compView) this.compView = require('./ComponentView').default;
+    const { config, opts, em } = this;
+    const fragment = fragmentEl || null;
+    const { frameView = {} } = config;
+    const sameFrameView = frameView.model && model.getView(frameView.model);
+    const dt =
+      opts.componentTypes || (em && em.get('DomComponents').getTypes());
+    const type = model.get('type');
+    let viewObject = this.compView;
+
+    for (let it = 0; it < dt.length; it++) {
+      if (dt[it].id == type) {
+        viewObject = dt[it].view;
+        break;
+      }
+    }
+    const view =
+      sameFrameView ||
+      new viewObject({
+        model,
+        config,
+        componentTypes: dt
+      });
+    let rendered;
+
+    try {
+      // Avoid breaking on DOM rendering (eg. invalid attribute name)
+      rendered = view.render().el;
+    } catch (error) {
+      rendered = document.createTextNode('');
+      em.logError(error);
+    }
+
+    if (fragment) {
+      fragment.appendChild(rendered);
+    } else {
+      const parent = this.parentEl;
+      const children = parent.childNodes;
+
+      if (!isUndefined(index)) {
+        const lastIndex = children.length == index;
+
+        // If the added model is the last of collection
+        // need to change the logic of append
+        if (lastIndex) {
+          index--;
+        }
+
+        // In case the added is new in the collection index will be -1
+        if (lastIndex || !children.length) {
+          parent.appendChild(rendered);
+        } else {
+          parent.insertBefore(rendered, children[index]);
+        }
+      } else {
+        parent.appendChild(rendered);
+      }
+    }
+
+    return rendered;
+  },
+
+  resetChildren(models, { previousModels = [] } = {}) {
+    this.parentEl.innerHTML = '';
+    previousModels.forEach(md => this.removeChildren(md, this.collection));
+    models.each(model => this.addToCollection(model));
+  },
+
+  render(parent) {
+    const el = this.el;
+    const frag = document.createDocumentFragment();
+    this.parentEl = parent || this.el;
+    this.collection.each(model => this.addToCollection(model, frag));
+    el.innerHTML = '';
+    el.appendChild(frag);
+    return this;
+  }
 });

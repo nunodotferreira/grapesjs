@@ -1,26 +1,28 @@
-define([ 'backbone','require'], 
-	function (Backbone, require) {
-	/**
-	 * @class Button
-	 * */
-	return Backbone.Model.extend({
-		
-		defaults :{
-			id 			: '',
-			className	: '',
-			command		: '',
-			context		: '',
-			buttons		: [],
-			attributes	: {},
-			active		: false,
-		},
-	
-		initialize: function(options) {
-			if(this.get('buttons').length){
-				var Buttons	= require('./Buttons');
-				this.set('buttons', new Buttons(this.get('buttons')) );
-			}
-		},
-	
-	});
+import Backbone from 'backbone';
+
+export default Backbone.Model.extend({
+  defaults: {
+    id: '',
+    label: '',
+    tagName: 'span',
+    className: '',
+    command: '',
+    context: '',
+    buttons: [],
+    attributes: {},
+    options: {},
+    active: false,
+    dragDrop: false,
+    togglable: true,
+    runDefaultCommand: true,
+    stopDefaultCommand: false,
+    disable: false
+  },
+
+  initialize(options) {
+    if (this.get('buttons').length) {
+      var Buttons = require('./Buttons').default;
+      this.set('buttons', new Buttons(this.get('buttons')));
+    }
+  }
 });

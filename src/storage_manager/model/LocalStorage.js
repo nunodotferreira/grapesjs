@@ -1,57 +1,58 @@
-define(['backbone'],
-	function (Backbone) {
-		/**
-		 * @class LocalStorage
-		 * */
-		return Backbone.Model.extend({
+import Backbone from 'backbone';
 
-			defaults: {
-				checkSupport		: true,
-				errorNoSupport		: 'Error encountered while parsing JSON response',
-			},
+export default Backbone.Model.extend({
+  defaults: {
+    checkLocal: true
+  },
 
-			/** @inheritdoc */
-			getId	: function() {
-				return	'local';
-			},
+  /**
+   * @private
+   */
+  store(data, clb) {
+    this.checkStorageEnvironment();
 
-			/** @inheritdoc */
-			store	: function(name, value) {
-				this.checkStorageEnvironment();
-				localStorage.setItem(name, value );
-			},
+    for (var key in data) localStorage.setItem(key, data[key]);
 
-			/** @inheritdoc */
-			load: function(name){
-				var result	= null;
-				this.checkStorageEnvironment();
-				if(localStorage.getItem(name))
-					result 	= localStorage.getItem(name);
-				try{
-					var prx	= "Loading '" + name + "': ";
-					if(!result)
-						throw prx + ' Resource was not found';
-				}catch(err){
-					console.warn(err);
-				}
-				return result;
-			},
+    if (typeof clb == 'function') {
+      clb();
+    }
+  },
 
-			/** @inheritdoc */
-			remove	: function(name) {
-				this.checkStorageEnvironment();
-				localStorage.removeItem(name);
-			},
+  /**
+   * @private
+   */
+  load(keys, clb) {
+    this.checkStorageEnvironment();
+    var result = {};
 
-			/**
-			 * Check storage environment
-			 * @return void
-			 * */
-			checkStorageEnvironment: function(){
-				if(this.get('checkSupport'))
-					if( !localStorage )
-						console.warn(this.get('errorNoSupport'));
-			},
+    for (var i = 0, len = keys.length; i < len; i++) {
+      var value = localStorage.getItem(keys[i]);
+      if (value) result[keys[i]] = value;
+    }
 
-		});
+    if (typeof clb == 'function') {
+      clb(result);
+    }
+
+    return result;
+  },
+
+  /**
+   * @private
+   */
+  remove(keys) {
+    this.checkStorageEnvironment();
+
+    for (var i = 0, len = keys.length; i < len; i++)
+      localStorage.removeItem(keys[i]);
+  },
+
+  /**
+   * Check storage environment
+   * @private
+   * */
+  checkStorageEnvironment() {
+    if (this.get('checkLocal') && !localStorage)
+      console.warn("Your browser doesn't support localStorage");
+  }
 });

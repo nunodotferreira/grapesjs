@@ -1,37 +1,27 @@
-define(['Navigator'], function(Layers) {
-		/**
-		 * @class OpenStyleManager
-		 * */
-		return {
+import Backbone from 'backbone';
+import Layers from 'navigator';
 
-			run: function(em, sender)
-			{
-				if(!this.$layers){
-					var collection	= em.get('Components').getComponent().get('components'),
-						config				= em.get('Config'),
-						panels				= em.get('Panels'),
-						lyStylePfx		= config.layers.stylePrefix || 'nv-';
+const $ = Backbone.$;
 
-					config.layers.stylePrefix = config.stylePrefix + lyStylePfx;
-					config.layers.em 	= em;
-					var layers				= new Layers(collection, config.layers);
-					this.$layers 			= layers.render();
+export default {
+  run(editor) {
+    const lm = editor.LayerManager;
+    const pn = editor.Panels;
 
-					// Check if panel exists otherwise crate it
-					if(!panels.getPanel('views-container'))
-						this.panel			= panels.addPanel({ id: 'views-container'});
-					else
-						this.panel			= panels.getPanel('views-container');
+    if (!this.layers) {
+      const id = 'views-container';
+      const layers = document.createElement('div');
+      const panels = pn.getPanel(id) || pn.addPanel({ id });
+      layers.appendChild(lm.render());
+      panels.set('appendContent', layers).trigger('change:appendContent');
+      this.layers = layers;
+    }
 
-					this.panel.set('appendContent', this.$layers).trigger('change:appendContent');
-				}
-				this.$layers.show();
-			},
+    this.layers.style.display = 'block';
+  },
 
-			stop: function()
-			{
-				if(this.$layers)
-					this.$layers.hide();
-			}
-		};
-	});
+  stop() {
+    const layers = this.layers;
+    layers && (layers.style.display = 'none');
+  }
+};

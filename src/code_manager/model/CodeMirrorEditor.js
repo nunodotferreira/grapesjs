@@ -1,56 +1,100 @@
-define(['backbone',
-        'codemirror/lib/codemirror',
-        'codemirror/mode/htmlmixed/htmlmixed',
-        'codemirror/mode/css/css',
-        'formatting'
-        ],
-	function(Backbone, CodeMirror, htmlMode, cssMode, formatting) {
-		/**
-		 * @class CodeViewer
-		 * */
-		return Backbone.Model.extend({
+import { bindAll } from 'underscore';
+import Backbone from 'backbone';
+import CodeMirror from 'codemirror/lib/codemirror';
+import 'codemirror/mode/htmlmixed/htmlmixed';
+import 'codemirror/mode/css/css';
+import 'codemirror-formatting';
 
-			defaults: {
-				input		: '',
-				label		: '',
-				codeName 	: '',
-				theme		: '',
-				readOnly 	: true,
-				lineNumbers	: true,
-			},
+export default Backbone.Model.extend({
+  CodeMirror,
 
-			/** @inheritdoc */
-			getId	: function()
-			{
-				return 'CodeMirror';
-			},
+  defaults: {
+    input: '',
+    label: '',
+    codeName: '',
+    theme: 'hopscotch',
+    readOnly: true,
+    lineNumbers: true
+  },
 
-			/** @inheritdoc */
-			init: function(el)
-			{
-				this.editor	= CodeMirror.fromTextArea(el, {
-					dragDrop		: false,
-					lineNumbers		: this.get('lineNumbers'),
-					readOnly		: this.get('readOnly'),
-				    mode			: this.get('codeName'),
-				    theme			: this.get('theme'),
-				});
+  /** @inheritdoc */
+  init(el) {
+    bindAll(this, 'onChange');
+    this.editor = CodeMirror.fromTextArea(el, {
+      dragDrop: false,
+      lineWrapping: true,
+      mode: this.get('codeName'),
+      ...this.attributes
+    });
+    this.element = el;
+    this.editor.on('change', this.onChange);
 
-				return this;
-			},
+    return this;
+  },
 
-			/** @inheritdoc */
-			setContent	: function(v)
-			{
-				if(!this.editor)
-					return;
-				this.editor.setValue(v);
-				if(this.editor.autoFormatRange){
-					CodeMirror.commands.selectAll(this.editor);
-					this.editor.autoFormatRange(this.editor.getCursor(true), this.editor.getCursor(false) );
-					CodeMirror.commands.goDocStart(this.editor);
-				}
-			},
+  onChange() {
+    this.trigger('update', this);
+  },
 
-        });
-	});
+  getEditor() {
+    return this.editor;
+  },
+
+  /**
+   * The element where the viewer is attached
+   * @return {HTMLElement}
+   */
+  getElement() {
+    return this.element;
+  },
+
+  /**
+   * Set the element which contains the viewer attached.
+   * Generally, it should be just a textarea, but some editor might require
+   * a container for it some in that case this method can be used
+   * @param {HTMLElement} el
+   * @return {self}
+   */
+  setElement(el) {
+    this.element = el;
+    return this;
+  },
+
+  /**
+   * Refresh the viewer
+   * @return {self}
+   */
+  refresh() {
+    this.getEditor().refresh();
+    return this;
+  },
+
+  /**
+   * Focus the viewer
+   * @return {self}
+   */
+  focus() {
+    this.getEditor().focus();
+    return this;
+  },
+
+  getContent() {
+    const ed = this.getEditor();
+    return ed && ed.getValue();
+  },
+
+  /** @inheritdoc */
+  setContent(v, opts = {}) {
+    const { editor } = this;
+    if (!editor) return;
+    editor.setValue(v);
+
+    if (editor.autoFormatRange) {
+      CodeMirror.commands.selectAll(editor);
+      editor.autoFormatRange(editor.getCursor(true), editor.getCursor(false));
+      CodeMirror.commands.goDocStart(editor);
+    }
+
+    !opts.noRefresh && setTimeout(() => this.refresh());
+  }
+});

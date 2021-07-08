@@ -1,89 +1,151 @@
-define(['backbone','./ItemView'],
-	function (Backbone, ItemView) {
-	/**
-	 * @class ItemsView
-	 * */
-	return Backbone.View.extend({
+import { View } from 'backbone';
+import { eventDrag } from 'dom_components/model/Component';
 
-		initialize: function(o) {
-			this.opt 			= o;
-			this.config		= o.config;
-			this.preview	= o.preview;
-			this.sorter		= o.sorter || {};
-			this.pfx			= o.config.stylePrefix;
-			this.parent		= o.parent;
-			this.listenTo( this.collection, 'add', this.addTo );
-			this.listenTo( this.collection, 'reset', this.render );
-			this.className 	= this.pfx + 'items';
+export default View.extend({
+  initialize(o = {}) {
+    this.items = [];
+    this.opt = o;
+    const config = o.config || {};
+    this.level = o.level;
+    this.config = config;
+    this.preview = o.preview;
+    this.ppfx = config.pStylePrefix || '';
+    this.pfx = config.stylePrefix || '';
+    this.parent = o.parent;
+    this.parentView = o.parentView;
+    const pfx = this.pfx;
+    const ppfx = this.ppfx;
+    const parent = this.parent;
+    const coll = this.collection;
+    this.listenTo(coll, 'add', this.addTo);
+    this.listenTo(coll, 'reset resetNavigator', this.render);
+    this.listenTo(coll, 'remove', this.removeChildren);
+    this.className = `${pfx}layers`;
+    const em = config.em;
 
-			if(!this.parent)
-				this.className	+= ' ' + this.pfx + this.config.containerId;
-		},
+    if (config.sortable && !this.opt.sorter) {
+      const utils = em.get('Utils');
+      this.opt.sorter = new utils.Sorter({
+        container: config.sortContainer || this.el,
+        containerSel: `.${this.className}`,
+        itemSel: `.${pfx}layer`,
+        ignoreViewChildren: 1,
+        onEndMove(created, sorter, data) {
+          const srcModel = sorter.getSourceModel();
+          em.setSelected(srcModel, { forceChange: 1 });
+          em.trigger(`${eventDrag}:end`, data);
+        },
+        avoidSelectOnEnd: 1,
+        nested: 1,
+        ppfx,
+        pfx
+      });
+    }
 
-		/**
-		 * Add to collection
-		 * @param Object Model
-		 *
-		 * @return Object
-		 * */
-		addTo: function(model){
-			var i	= this.collection.indexOf(model);
-			this.addToCollection(model, null, i);
-		},
+    this.sorter = this.opt.sorter || '';
 
-		/**
-		 * Add new object to collection
-		 * @param	Object	Model
-		 * @param	Object 	Fragment collection
-		 * @param	integer	Index of append
-		 *
-		 * @return Object Object created
-		 * */
-		addToCollection: function(model, fragmentEl, index){
-			var fragment	= fragmentEl || null;
-			var viewObject	= ItemView;
+    // For the sorter
+    this.$el.data('collection', coll);
+    parent && this.$el.data('model', parent);
+  },
 
-			var view 		= new viewObject({
-				model 	: model,
-				config	: this.config,
-				sorter	: this.sorter,
-			});
-			var rendered	= view.render().el;
+  removeChildren(removed) {
+    const view = removed.viewLayer;
+    if (!view) return;
+    view.remove();
+    removed.viewLayer = 0;
+  },
 
-			if(fragment){
-				fragment.appendChild(rendered);
-			}else{
-				if(typeof index != 'undefined'){
-					var method	= 'before';
-					// If the added model is the last of collection
-					// need to change the logic of append
-					if(this.$el.children().length == index){
-						index--;
-						method	= 'after';
-					}
-					// In case the added is new in the collection index will be -1
-					if(index < 0){
-						this.$el.append(rendered);
-					}else
-						this.$el.children().eq(index)[method](rendered);
-				}else
-					this.$el.append(rendered);
-			}
+  /**
+   * Add to collection
+   * @param Object Model
+   *
+   * @return Object
+   * */
+  addTo(model) {
+    var i = this.collection.indexOf(model);
+    this.addToCollection(model, null, i);
+  },
 
-			return rendered;
-		},
+  /**
+   * Add new object to collection
+   * @param  Object  Model
+   * @param  Object   Fragment collection
+   * @param  integer  Index of append
+   *
+   * @return Object Object created
+   * */
+  addToCollection(model, fragmentEl, index) {
+    const { level, parentView, opt } = this;
+    const { ItemView } = opt;
+    const fragment = fragmentEl || null;
+    const item = new ItemView({
+      ItemView,
+      level,
+      model,
+      parentView,
+      config: this.config,
+      sorter: this.sorter,
+      isCountable: this.isCountable,
+      opened: this.opt.opened
+    });
+    const rendered = item.render().el;
 
-		render: function() {
-			var fragment = document.createDocumentFragment();
-			this.$el.empty();
+    if (fragment) {
+      fragment.appendChild(rendered);
+    } else {
+      if (typeof index != 'undefined') {
+        var method = 'before';
+        // If the added model is the last of collection
+        // need to change the logic of append
+        if (this.$el.children().length == index) {
+          index--;
+          method = 'after';
+        }
+        // In case the added is new in the collection index will be -1
+        if (index < 0) {
+          this.$el.append(rendered);
+        } else
+          this.$el
+            .children()
+            .eq(index)
+            [method](rendered);
+      } else this.$el.append(rendered);
+    }
+    this.items.push(item);
+    return rendered;
+  },
 
-			this.collection.each(function(model){
-				this.addToCollection(model, fragment);
-			},this);
+  remove() {
+    View.prototype.remove.apply(this, arguments);
+    this.items.map(i => i.remove());
+  },
 
-			this.$el.append(fragment);
-			this.$el.attr('class', _.result(this, 'className'));
-			return this;
-		}
-	});
+  /**
+   * Check if the model could be count by the navigator
+   * @param  {Object}  model
+   * @return {Boolean}
+   * @private
+   */
+  isCountable(model, hide) {
+    var type = model.get('type');
+    var tag = model.get('tagName');
+    if (
+      ((type == 'textnode' || tag == 'br') && hide) ||
+      !model.get('layerable')
+    ) {
+      return false;
+    }
+    return true;
+  },
+
+  render() {
+    const frag = document.createDocumentFragment();
+    const el = this.el;
+    el.innerHTML = '';
+    this.collection.each(model => this.addToCollection(model, frag));
+    el.appendChild(frag);
+    el.className = this.className;
+    return this;
+  }
 });

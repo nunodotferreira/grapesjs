@@ -1,233 +1,190 @@
-define(['backbone','require'],
-function(Backbone, require) {
-	/**
-	 * @class ButtonView
-	 * */
-	return Backbone.View.extend({
+import Backbone from 'backbone';
+import { isString, isObject, isFunction } from 'underscore';
 
-		tagName		: 'span',
+const $ = Backbone.$;
 
-		events		: { 'click'	: 'clicked'	},
+export default Backbone.View.extend({
+  tagName() {
+    return this.model.get('tagName');
+  },
 
-		initialize: function(o){
-			_.bindAll(this, 'startTimer', 'stopTimer', 'showButtons', 'hideButtons','closeOnKeyPress');
-			this.config 	= o.config;
-			this.em			= this.config.em || {};
-			this.pfx 		= this.config.stylePrefix;
-			this.id			= this.pfx + this.model.get('id');
-			this.className	= this.pfx + 'btn ' + this.model.get('className');
-			this.activeCls	= this.pfx + 'active';
-			this.btnsVisCls	= this.pfx + 'visible';
-			this.parentM	= o.parentM || null;
-			this.listenTo(this.model, 'change:active updateActive', this.updateActive);
-			this.listenTo(this.model, 'checkActive', this.checkActive);
-			this.listenTo(this.model, 'change:bntsVis',		this.updateBtnsVis);
-			this.listenTo(this.model, 'change:attributes', 	this.updateAttributes);
-			this.listenTo(this.model, 'change:className', 	this.updateClassName);
+  events: {
+    click: 'clicked'
+  },
 
-			if(this.model.get('buttons').length){
-				this.$el.on('mousedown', this.startTimer);
-				this.$el.append($('<div>',{class: this.pfx + 'arrow-rd'}));
-			}
+  initialize(o) {
+    const { model } = this;
+    const cls = model.get('className');
+    const { command, listen } = model.attributes;
+    const config = o.config || {};
+    const { em } = config;
+    this.config = config;
+    this.em = em;
+    const pfx = this.config.stylePrefix || '';
+    const ppfx = this.config.pStylePrefix || '';
+    this.pfx = pfx;
+    this.ppfx = this.config.pStylePrefix || '';
+    this.id = pfx + model.get('id');
+    this.activeCls = `${pfx}active ${ppfx}four-color`;
+    this.disableCls = `${ppfx}disabled`;
+    this.btnsVisCls = `${pfx}visible`;
+    this.className = pfx + 'btn' + (cls ? ' ' + cls : '');
+    this.listenTo(model, 'change', this.render);
+    this.listenTo(model, 'change:active updateActive', this.updateActive);
+    this.listenTo(model, 'checkActive', this.checkActive);
+    this.listenTo(model, 'change:bntsVis', this.updateBtnsVis);
+    this.listenTo(model, 'change:attributes', this.updateAttributes);
+    this.listenTo(model, 'change:className', this.updateClassName);
+    this.listenTo(model, 'change:disable', this.updateDisable);
 
-			if(this.em)
-				this.commands	= this.em.get('Commands');
-		},
+    if (em && isString(command) && listen) {
+      const chnOpt = { fromListen: 1 };
+      this.listenTo(em, `run:${command}`, () =>
+        model.set('active', true, chnOpt)
+      );
+      this.listenTo(em, `stop:${command}`, () =>
+        model.set('active', false, chnOpt)
+      );
+    }
 
-		/**
-		 * Updates class name of the button
-		 *
-		 * @return 	void
-		 * */
-		updateClassName: function()
-		{
-			this.$el.attr('class', this.pfx + 'btn ' + this.model.get('className'));
-		},
+    if (em && em.get) this.commands = em.get('Commands');
+  },
 
-		/**
-		 * Updates attributes of the button
-		 *
-		 * @return 	void
-		 * */
-		updateAttributes: function()
-		{
-			this.$el.attr(this.model.get("attributes"));
-		},
+  /**
+   * Updates class name of the button
+   *
+   * @return   void
+   * */
+  updateClassName() {
+    const { model, pfx } = this;
+    const cls = model.get('className');
+    const attrCls = model.get('attributes').class;
+    const classStr = `${attrCls ? attrCls : ''} ${pfx}btn ${cls ? cls : ''}`;
+    this.$el.attr('class', classStr.trim());
+  },
 
-		/**
-		 * Updates visibility of children buttons
-		 *
-		 * @return	void
-		 * */
-		updateBtnsVis: function()
-		{
-			if(!this.$buttons)
-				return;
+  /**
+   * Updates attributes of the button
+   *
+   * @return   void
+   * */
+  updateAttributes() {
+    const { em, model, $el } = this;
+    const attr = model.get('attributes') || {};
+    const title = em && em.t && em.t(`panels.buttons.titles.${model.id}`);
+    $el.attr(attr);
+    title && $el.attr({ title });
 
-			if(this.model.get('bntsVis'))
-				this.$buttons.addClass(this.btnsVisCls);
-			else
-				this.$buttons.removeClass(this.btnsVisCls);
-		},
+    this.updateClassName();
+  },
 
-		/**
-		 * Start timer for showing children buttons
-		 *
-		 * @return	void
-		 * */
-		startTimer: function()
-		{
-			this.timeout = setTimeout(this.showButtons, this.config.delayBtnsShow);
-			$(document).on('mouseup', 	this.stopTimer);
-		},
+  /**
+   * Updates visibility of children buttons
+   *
+   * @return  void
+   * */
+  updateBtnsVis() {
+    if (!this.$buttons) return;
 
-		/**
-		 * Stop timer for showing children buttons
-		 *
-		 * @return	void
-		 * */
-		stopTimer: function()
-		{
-			$(document).off('mouseup', 	this.stopTimer);
-			if(this.timeout)
-				clearTimeout(this.timeout);
-		},
+    if (this.model.get('bntsVis')) this.$buttons.addClass(this.btnsVisCls);
+    else this.$buttons.removeClass(this.btnsVisCls);
+  },
 
-		/**
-		 * Show children buttons
-		 *
-		 * @return 	void
-		 * */
-		showButtons: function()
-		{
-			clearTimeout(this.timeout);
-			this.model.set('bntsVis', true);
-			$(document).on('mousedown',	this.hideButtons);
-			$(document).on('keypress',	this.closeOnKeyPress);
-		},
-		/**
-		 * Hide children buttons
-		 *
-		 * @return 	void
-		 * */
-		hideButtons: function(e)
-		{
-			if(e){ $(e.target).trigger('click'); }
-			this.model.set('bntsVis', false);
-			$(document).off('mousedown',	this.hideButtons);
-			$(document).off('keypress', 	this.closeOnKeyPress);
-		},
+  /**
+   * Update active status of the button
+   *
+   * @return   void
+   * */
+  updateActive(m, v, opts = {}) {
+    const { model, commands, $el, activeCls } = this;
+    const { fromCollection, fromListen } = opts;
+    const context = model.get('context');
+    const options = model.get('options');
+    const commandName = model.get('command');
+    let command = {};
 
-		/**
-		 * Close buttons on ESC key press
-		 * @param 	{Object}	e	Event
-		 *
-		 * @return 	void
-		 * */
-		closeOnKeyPress: function(e)
-		{
-			var key = e.which || e.keyCode;
-			if(key == 27)
-				this.hideButtons();
-		},
+    if (!commandName) return;
 
-		/**
-		 * Update active status of the button
-		 *
-		 * @return 	void
-		 * */
-		updateActive: function(){
-			var command	= null;
+    if (commands && isString(commandName)) {
+      command = commands.get(commandName) || {};
+    } else if (isFunction(commandName)) {
+      command = commands.create({ run: commandName });
+    } else if (commandName !== null && isObject(commandName)) {
+      command = commands.create(commandName);
+    }
 
-			if(this.commands)
-				command	= this.commands.get(this.model.get('command'));
+    if (model.get('active')) {
+      !fromCollection && model.collection.deactivateAll(context, model);
+      model.set('active', true, { silent: true }).trigger('checkActive');
+      !fromListen &&
+        commands.runCommand(command, { ...options, sender: model });
 
-			if(this.model.get('active')){
+      // Disable button if the command has no stop method
+      command.noStop && model.set('active', false);
+    } else {
+      $el.removeClass(activeCls);
+      !fromListen &&
+        commands.stopCommand(command, { ...options, sender: model, force: 1 });
+    }
+  },
 
-				this.model.collection.deactivateAll(this.model.get('context'));
-				this.model.set('active', true, { silent: true }).trigger('checkActive');
+  updateDisable() {
+    const { disableCls, model } = this;
+    const disable = model.get('disable');
+    this.$el[disable ? 'addClass' : 'removeClass'](disableCls);
+  },
 
-				if(this.parentM)
-					this.parentM.set('active', true, { silent: true }).trigger('checkActive');
+  /**
+   * Update active style status
+   *
+   * @return   void
+   * */
+  checkActive() {
+    const { model, $el, activeCls } = this;
+    model.get('active') ? $el.addClass(activeCls) : $el.removeClass(activeCls);
+  },
 
-				if(command)
-					command.run(this.em, this.model);
-			}else{
-				this.$el.removeClass(this.activeCls);
+  /**
+   * Triggered when button is clicked
+   * @param  {Object}  e  Event
+   *
+   * @return   void
+   * */
+  clicked(e) {
+    const { model } = this;
 
-				this.model.collection.deactivateAll(this.model.get('context'));
+    if (model.get('bntsVis') || model.get('disable') || !model.get('command'))
+      return;
 
-				if(this.parentM)
-					this.parentM.set('active', false, { silent: true }).trigger('checkActive');
+    this.toggleActive();
+  },
 
-				if(command)
-					command.stop(this.em, this.model);
-			}
-		},
+  toggleActive() {
+    const { model, em } = this;
+    const { active, togglable } = model.attributes;
 
-		/**
-		 * Update active style status
-		 *
-		 * @return 	void
-		 * */
-		checkActive: function(){
-			if(this.model.get('active'))
-				this.$el.addClass(this.activeCls);
-			else
-				this.$el.removeClass(this.activeCls);
-		},
+    if (active && !togglable) return;
 
-		/**
-		 * Triggered when button is clicked
-		 * @param	{Object}	e	Event
-		 *
-		 * @return 	void
-		 * */
-		clicked: function(e)
-		{
-			if(this.model.get('bntsVis') )
-				return;
+    model.set('active', !active);
 
-			if(this.parentM)
-				this.swapParent();
+    // If the stop is requested
+    if (active) {
+      if (model.get('runDefaultCommand')) em.runDefault();
+    } else {
+      if (model.get('stopDefaultCommand')) em.stopDefault();
+    }
+  },
 
-			this.model.set('active', !this.model.get('active'));
-		},
+  render() {
+    const { model } = this;
+    const label = model.get('label');
+    const { $el } = this;
+    !model.get('el') && $el.empty();
+    this.updateAttributes();
+    label && $el.append(label);
+    this.checkActive();
+    this.updateDisable();
 
-		/**
-		 * Updates parent model swapping properties
-		 *
-		 * @return	void
-		 * */
-		swapParent: function()
-		{
-			this.parentM.collection.deactivateAll(this.model.get('context'));
-			this.parentM.set('attributes', 	this.model.get('attributes'));
-			this.parentM.set('options', 	this.model.get('options'));
-			this.parentM.set('command', 	this.model.get('command'));
-			this.parentM.set('className', 	this.model.get('className'));
-			this.parentM.set('active', true, { silent: true }).trigger('checkActive');
-		},
-
-		render: function()
-		{
-			this.updateAttributes();
-			this.$el.attr('class', this.className);
-
-			if(this.model.get('buttons').length){
-				var btnsView = require('./ButtonsView');								//Avoid Circular Dependencies
-				var view = new btnsView({
-						collection 	: this.model.get('buttons'),
-						config		: this.config,
-						parentM		: this.model
-				});
-				this.$buttons	= view.render().$el;
-				this.$buttons.append($('<div>',{class: this.pfx + 'arrow-l'}));
-				this.$el.append(this.$buttons);											//childNodes avoids wrapping 'div'
-			}
-
-			return this;
-		},
-
-	});
+    return this;
+  }
 });

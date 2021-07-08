@@ -1,52 +1,67 @@
-define(function () {
-	return {
-		// Enable/Disable autosaving
-		autosave 			: 1,
+export default {
+  // Prefix identifier that will be used inside storing and loading
+  id: 'gjs-',
 
-		// Indicates which storage to use. Available: local | remote
-		storageType			: 'local',
+  // Enable/Disable autosaving
+  autosave: 1,
 
-		// If autosave enabled, indicates how many changes (general changes to structure)
-		// need to be done before save. Useful with remoteStorage to reduce remote calls
-		changesBeforeSave	: 1,
+  // Indicates if load data inside editor after init
+  autoload: 1,
 
-		// Defaults for remote storage
-		remoteStorage		: {
-			//Enable/Disable components model (JSON format)
-			storeComponents: 	true,
-			//Enable/Disable styles model (JSON format)
-			storeStyles: 		false,
-			//Enable/Disable saving HTML template
-			storeHTML: 			false,
-			/**
-			 * Url where to save all stuff.
-			 * The request will send a POST via AJAX, like this:
-			 * {
-			 * 		components: '',
-			 * 		style:		'',
-			 * 		html:		'', 			//if storeHTML is enabled
-			 * }
-			 * */
-			urlStore: '',
-			/**
-			 * Use this url to fetch model data, does expect in response something like this:
-			 * { data: {
-			 * 		components: '',
-			 * 		style: '',
-			 * } }
-			 */
-			urlLoad: '',
-			/**
-			 * Url where assets will be send
-			 * */
-			urlUpload: '',
-			paramsStore	:{},							//Custom parameters to pass with set request
-			paramsLoad	:{},							//Custom parameters to pass with get request
-			beforeSend	: function(jqXHR,settings){},	//Callback before request
-			onComplete	: function(jqXHR,status){},	//Callback after request
-		},
+  // Indicates which storage to use. Available: local | remote
+  type: 'local',
 
-		// Defaults for local storage
-		localStorage		: {},
-	};
-});
+  // If autosave enabled, indicates how many steps (general changes to structure)
+  // need to be done before save. Useful with remoteStorage to reduce remote calls
+  stepsBeforeSave: 1,
+
+  //Enable/Disable components model (JSON format)
+  storeComponents: 1,
+
+  //Enable/Disable styles model (JSON format)
+  storeStyles: 1,
+
+  //Enable/Disable saving HTML template
+  storeHtml: 1,
+
+  //Enable/Disable saving CSS template
+  storeCss: 1,
+
+  // ONLY FOR LOCAL STORAGE
+  // If enabled, checks if browser supports Local Storage
+  checkLocal: 1,
+
+  // ONLY FOR REMOTE STORAGE
+  // Custom parameters to pass with the remote storage request, eg. csrf token
+  params: {},
+
+  // Custom headers for the remote storage request
+  headers: {},
+
+  // Endpoint where to save all stuff
+  urlStore: '',
+
+  // Endpoint where to fetch data
+  urlLoad: '',
+
+  //Callback before request
+  beforeSend(jqXHR, settings) {},
+
+  //Callback after request
+  onComplete(jqXHR, status) {},
+
+  // set contentType paramater of $.ajax
+  // true: application/json; charset=utf-8'
+  // false: 'x-www-form-urlencoded'
+  contentTypeJson: true,
+
+  credentials: 'include',
+
+  // Pass custom options to fetch API (remote storage)
+  // You can pass a simple object: { someOption: 'someValue' }
+  // or a function wich returns and object to add:
+  // currentOpts => {
+  //  return currentOpts.method === 'post' ?  { method: 'patch' } : {};
+  // }
+  fetchOptions: ''
+};

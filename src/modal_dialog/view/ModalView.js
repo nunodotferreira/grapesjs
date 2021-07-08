@@ -1,111 +1,143 @@
-define(['backbone', 'text!./../template/modal.html'],
-	function (Backbone, modalTemplate) {
-		/**
-		 * @class ModalView
-		 * */
-		return Backbone.View.extend({
+import Backbone from 'backbone';
 
-			template: _.template(modalTemplate),
+export default Backbone.View.extend({
+  template({ pfx, ppfx, content, title }) {
+    return `<div class="${pfx}dialog ${ppfx}one-bg ${ppfx}two-color">
+      <div class="${pfx}header">
+        <div class="${pfx}title">${title}</div>
+        <div class="${pfx}btn-close" data-close-modal>&Cross;</div>
+      </div>
+      <div class="${pfx}content">
+        <div id="${pfx}c">${content}</div>
+        <div style="clear:both"></div>
+      </div>
+    </div>
+    <div class="${pfx}collector" style="display: none"></div>`;
+  },
 
-			events	: {},
+  events: {
+    click: 'onClick',
+    'click [data-close-modal]': 'hide'
+  },
 
-			initialize: function(o){
-				this.config		= o.config || {};
-				this.pfx		= this.config.stylePrefix;
-				this.listenTo( this.model, 'change:open', 	this.updateOpen);
-				this.listenTo( this.model, 'change:title', 	this.updateTitle);
-				this.listenTo( this.model, 'change:content',this.updateContent);
-				this.events['click .'+this.pfx+'btn-close']	= 'hide';
+  initialize(o) {
+    const model = this.model;
+    const config = o.config || {};
+    const pfx = config.stylePrefix || '';
+    this.config = config;
+    this.pfx = pfx;
+    this.ppfx = config.pStylePrefix || '';
+    this.listenTo(model, 'change:open', this.updateOpen);
+    this.listenTo(model, 'change:title', this.updateTitle);
+    this.listenTo(model, 'change:content', this.updateContent);
+  },
 
-				if(this.config.backdrop)
-					this.events['click .'+this.pfx+'backlayer'] = 'hide';
+  onClick(e) {
+    const bkd = this.config.backdrop;
+    bkd && e.target === this.el && this.hide();
+  },
 
-				this.delegateEvents();
-			},
+  /**
+   * Returns collector element
+   * @return {HTMLElement}
+   * @private
+   */
+  getCollector() {
+    if (!this.$collector)
+      this.$collector = this.$el.find('.' + this.pfx + 'collector');
+    return this.$collector;
+  },
 
-			/**
-			 * Update content
-			 *
-			 * @return	void
-			 * */
-			updateContent: function(){
-				if(!this.$content)
-					this.$content	= this.$el.find('.'+this.pfx+'content #'+this.pfx+'c');
-				this.$content.html(this.model.get('content'));
-			},
+  /**
+   * Returns content element
+   * @return {HTMLElement}
+   * @private
+   */
+  getContent() {
+    const pfx = this.pfx;
 
-			/**
-			 * Update title
-			 *
-			 * @return	void
-			 * */
-			updateTitle: function(){
-				if(!this.$title)
-					this.$title	= this.$el.find('.'+this.pfx+'title');
-				this.$title.html(this.model.get('title'));
-			},
+    if (!this.$content) {
+      this.$content = this.$el.find(`.${pfx}content #${pfx}c`);
+    }
 
-			/**
-			 * Update open
-			 *
-			 * @return	void
-			 * */
-			updateOpen: function(){
-				if(this.model.get('open'))
-					this.$el.show();
-				else
-					this.$el.hide();
-			},
+    return this.$content;
+  },
 
-			/**
-			 * Hide modal
-			 *
-			 * @return void
-			 * */
-			hide: function(){
-				this.model.set('open', 0);
-			},
+  /**
+   * Returns title element
+   * @return {HTMLElement}
+   * @private
+   */
+  getTitle() {
+    if (!this.$title) this.$title = this.$el.find('.' + this.pfx + 'title');
+    return this.$title.get(0);
+  },
 
-			/**
-			 * Show modal
-			 *
-			 * @return void
-			 * */
-			show: function(){
-				this.model.set('open', 1);
-			},
+  /**
+   * Update content
+   * @private
+   * */
+  updateContent() {
+    var content = this.getContent();
+    const children = content.children();
+    const coll = this.getCollector();
+    const body = this.model.get('content');
+    children.length && coll.append(children);
+    content.empty().append(body);
+  },
 
-			/**
-			 * Set title
-			 * @param	{String}	v Title
-			 *
-			 * @return 	this
-			 * */
-			setTitle: function(v){
-				this.model.set('title',v);
-				return this;
-			},
+  /**
+   * Update title
+   * @private
+   * */
+  updateTitle() {
+    var title = this.getTitle();
+    if (title) title.innerHTML = this.model.get('title');
+  },
 
-			/**
-			 * Set content
-			 * @param	{String}	v Title
-			 *
-			 * @return 	this
-			 * */
-			setContent: function(v){
-				this.model.set('content',v);
-				return this;
-			},
+  /**
+   * Update open
+   * @private
+   * */
+  updateOpen() {
+    this.el.style.display = this.model.get('open') ? '' : 'none';
+  },
 
-			render : function(){
-				var	obj		= this.model.toJSON();
-				obj.pfx		= this.pfx;
-				this.$el.html( this.template(obj) );
-				this.$el.attr('class', this.pfx + 'container');
-				this.updateOpen();
+  /**
+   * Hide modal
+   * @private
+   * */
+  hide() {
+    this.model.set('open', 0);
+  },
 
-				return this;
-			},
+  /**
+   * Show modal
+   * @private
+   * */
+  show(opts = {}) {
+    this.model.set('open', 1);
+    this.updateAttr(opts.attributes);
+  },
 
-		});
+  updateAttr(attr) {
+    const { pfx, $el, el } = this;
+    const currAttr = [].slice.call(el.attributes).map(i => i.name);
+    $el.removeAttr(currAttr.join(' '));
+    $el.attr({
+      ...(attr || {}),
+      class: `${pfx}container ${(attr && attr.class) || ''}`.trim()
+    });
+  },
+
+  render() {
+    const el = this.$el;
+    const obj = this.model.toJSON();
+    obj.pfx = this.pfx;
+    obj.ppfx = this.ppfx;
+    el.html(this.template(obj));
+    this.updateAttr();
+    this.updateOpen();
+    return this;
+  }
 });

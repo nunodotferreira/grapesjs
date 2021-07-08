@@ -1,83 +1,78 @@
-define(['backbone', './SelectComponent'],
-	function(Backbone, SelectComponent) {
-		/**
-		 * @class DeleteComponent
-		 * */
-		return _.extend({},SelectComponent,{
+import { extend, bindAll } from 'underscore';
+import Backbone from 'backbone';
+import SelectComponent from './SelectComponent';
 
-			init: function(o){
-				_.bindAll(this, 'startDelete', 'stopDelete', 'onDelete');
-				this.hoverClass	= this.pfx + 'hover-delete';
-				this.badgeClass	= this.pfx + 'badge-red';
-			},
+const $ = Backbone.$;
 
-			enable: function()
-			{
-				var that = this;
-				this.$el.find('*')
-					.mouseover(this.startDelete)
-					.mouseout(this.stopDelete)
-					.click(this.onDelete);
-			},
+export default extend({}, SelectComponent, {
+  init(o) {
+    bindAll(this, 'startDelete', 'stopDelete', 'onDelete');
+    this.hoverClass = this.pfx + 'hover-delete';
+    this.badgeClass = this.pfx + 'badge-red';
+  },
 
-			/**
-			 * Start command
-			 * @param {Object}	e
-			 */
-			startDelete: function(e)
-			{
-					e.stopPropagation();
-					var $this 	=	$(e.target);
+  enable() {
+    var that = this;
+    this.$el
+      .find('*')
+      .mouseover(this.startDelete)
+      .mouseout(this.stopDelete)
+      .click(this.onDelete);
+  },
 
-					// Show badge if possible
-			    if($this.data('model').get('removable')){
-			    	$this.addClass(this.hoverClass);
-			    	this.attachBadge($this.get(0));
-			    }
+  /**
+   * Start command
+   * @param {Object}  e
+   * @private
+   */
+  startDelete(e) {
+    e.stopPropagation();
+    var $this = $(e.target);
 
-			},
+    // Show badge if possible
+    if ($this.data('model').get('removable')) {
+      $this.addClass(this.hoverClass);
+      this.attachBadge($this.get(0));
+    }
+  },
 
-			/**
-			 * Stop command
-			 * @param {Object}	e
-			 */
-			stopDelete: function(e)
-			{
-					e.stopPropagation();
-					var $this 	=	$(e.target);
-			    $this.removeClass(this.hoverClass);
+  /**
+   * Stop command
+   * @param {Object}  e
+   * @private
+   */
+  stopDelete(e) {
+    e.stopPropagation();
+    var $this = $(e.target);
+    $this.removeClass(this.hoverClass);
 
-			    // Hide badge if possible
-			    if(this.badge)
-			    	this.badge.css({ left: -1000, top:-1000 });
-			},
+    // Hide badge if possible
+    if (this.badge) this.badge.css({ left: -1000, top: -1000 });
+  },
 
-			/**
-			 * Delete command
-			 * @param {Object}	e
-			 */
-			onDelete: function(e)
-			{
-				e.stopPropagation();
-				var $this = $(e.target);
+  /**
+   * Delete command
+   * @param {Object}  e
+   * @private
+   */
+  onDelete(e) {
+    e.stopPropagation();
+    var $this = $(e.target);
 
-				// Do nothing in case can't remove
-				if(!$this.data('model').get('removable'))
-					return;
+    // Do nothing in case can't remove
+    if (!$this.data('model').get('removable')) return;
 
-				$this.data('model').destroy();
-				this.removeBadge();
-				this.clean();
-			},
+    $this.data('model').destroy();
+    this.removeBadge();
+    this.clean();
+  },
 
-			/**
-			 * Updates badge label
-			 * @param 	{Object}	model
-			 * */
-			updateBadgeLabel: function (model)
-			{
-				this.badge.html( 'Remove ' + model.getName() );
-			},
-
-		});
-	});
+  /**
+   * Updates badge label
+   * @param   {Object}  model
+   * @private
+   * */
+  updateBadgeLabel(model) {
+    this.badge.html('Remove ' + model.getName());
+  }
+});

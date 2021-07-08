@@ -1,65 +1,77 @@
-define(['StyleManager'], function(StyleManager) {
-		/**
-		 * @class OpenStyleManager
-		 * */
-		return {
+import Backbone from 'backbone';
+const $ = Backbone.$;
 
-			run: function(em, sender)
-			{
-				this.sender	= sender;
-				if(!this.$sm){
-					var config		= em.get('Config'),
-							panels		= em.get('Panels'),
-							pfx				= config.styleManager.stylePrefix || 'sm-';
+export default {
+  run(em, sender) {
+    this.sender = sender;
+    if (!this.$cn) {
+      var config = em.getConfig(),
+        panels = em.Panels;
+      // Main container
+      this.$cn = $('<div></div>');
+      // Secondary container
+      this.$cn2 = $('<div></div>');
+      this.$cn.append(this.$cn2);
 
-					config.styleManager.stylePrefix = config.stylePrefix + pfx;
-					config.styleManager.target		= em;
+      // Device Manager
+      var dvm = em.DeviceManager;
+      if (dvm && config.showDevices) {
+        var devicePanel = panels.addPanel({ id: 'devices-c' });
+        devicePanel
+          .set('appendContent', dvm.render())
+          .trigger('change:appendContent');
+      }
 
-					var sm		= new StyleManager(config.styleManager);
-					this.$sm	= sm.render();
+      // Class Manager container
+      var clm = em.SelectorManager;
+      if (clm) this.$cn2.append(clm.render([]));
+      this.$cn2.append(em.StyleManager.render());
+      var smConfig = em.StyleManager.getConfig();
+      const pfx = smConfig.stylePrefix;
+      // Create header
+      this.$header = $(
+        `<div class="${pfx}header">${em.t('styleManager.empty')}</div>`
+      );
+      this.$cn.append(this.$header);
 
-					if(!panels.getPanel('views-container'))
-						this.panel	= panels.addPanel({ id: 'views-container'});
-					else
-						this.panel	= panels.getPanel('views-container');
+      // Create panel if not exists
+      if (!panels.getPanel('views-container'))
+        this.panel = panels.addPanel({ id: 'views-container' });
+      else this.panel = panels.getPanel('views-container');
 
-					// Create header
-					this.$header	= $('<div>', {
-						class	: config.styleManager.stylePrefix + 'header',
-						text 	: config.styleManager.textNoElement,
-					});
+      // Add all containers to the panel
+      this.panel.set('appendContent', this.$cn).trigger('change:appendContent');
 
-					// Add all to the panel
-					this.panel.set('appendContent', this.$sm.add(this.$header) ).trigger('change:appendContent');
+      this.target = em.editor;
+      this.listenTo(this.target, 'component:toggled', this.toggleSm);
+    }
+    this.toggleSm();
+  },
 
-					this.target		= em;
-					this.listenTo( this.target ,'change:selectedComponent', this.toggleSm);
-				}
-				this.toggleSm();
-			},
+  /**
+   * Toggle Style Manager visibility
+   * @private
+   */
+  toggleSm() {
+    const { target, sender } = this;
+    if (sender && sender.get && !sender.get('active')) return;
+    const { componentFirst } = target.get('SelectorManager').getConfig();
+    const selectedAll = target.getSelectedAll().length;
 
-			/**
-			 * Toggle Style Manager visibility
-			 */
-			toggleSm: function()
-			{
-					if(!this.sender.get('active'))
-						return;
-					if(this.target.get('selectedComponent')){
-							this.$sm.show();
-							this.$header.hide();
-					}else{
-							this.$sm.hide();
-							this.$header.show();
-					}
-			},
+    if (selectedAll === 1 || (selectedAll > 1 && componentFirst)) {
+      this.$cn2.show();
+      this.$header.hide();
+    } else {
+      this.$cn2.hide();
+      this.$header.show();
+    }
+  },
 
-			stop: function()
-			{
-				if(this.$sm)
-					this.$sm.hide();
-				if(this.$header)
-					this.$header.hide();
-			}
-		};
-	});
+  stop() {
+    // Hide secondary container if exists
+    if (this.$cn2) this.$cn2.hide();
+
+    // Hide header container if exists
+    if (this.$header) this.$header.hide();
+  }
+};

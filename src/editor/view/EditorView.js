@@ -1,37 +1,43 @@
-define(['backbone'],
-function(Backbone){
-	/**
-	 * @class EditorView
-	 * */
-	return Backbone.View.extend({
-		
-		initialize: function() {
-			this.cv				= this.model.get('Canvas');
-			this.pn				= this.model.get('Panels');
-			this.className		= this.model.config.stylePrefix + 'editor';
-		},
+import Backbone from 'backbone';
+import { appendStyles } from 'utils/mixins';
 
-		render: function(){
-			this.$el.empty();
-			
-			this.$cont	= $('body ' + this.model.config.container);
-			
-			this.model.set('$editor', this.$el);
-			
-			if(this.cv)
-				this.$el.append(this.cv.render());
-			
-			if(this.pn)
-				this.$el.append(this.pn.render());
-			
-			this.$el.attr('class', this.className);
-			
-			this.$cont.html(this.$el);
-			
-			if(this.pn)
-				this.pn.active();
+const $ = Backbone.$;
 
-			return this;
-		}
-	});
+export default Backbone.View.extend({
+  initialize() {
+    const { model } = this;
+    model.view = this;
+    this.conf = model.config;
+    this.pn = model.get('Panels');
+    this.cv = model.get('Canvas');
+    model.once('change:ready', () => {
+      this.pn.active();
+      this.pn.disableButtons();
+      setTimeout(() => {
+        model.trigger('load', model.get('Editor'));
+        model.set('changesCount', 0);
+      });
+    });
+  },
+
+  render() {
+    const { model, $el, conf } = this;
+    const pfx = conf.stylePrefix;
+    const contEl = $(conf.el || `body ${conf.container}`);
+    appendStyles(conf.cssIcons, { unique: 1, prepand: 1 });
+    $el.empty();
+
+    if (conf.width) contEl.css('width', conf.width);
+    if (conf.height) contEl.css('height', conf.height);
+
+    $el.append(this.cv.render());
+    $el.append(this.pn.render());
+    $el.attr('class', `${pfx}editor ${pfx}one-bg ${pfx}two-color`);
+    contEl
+      .addClass(`${pfx}editor-cont`)
+      .empty()
+      .append($el);
+
+    return this;
+  }
 });

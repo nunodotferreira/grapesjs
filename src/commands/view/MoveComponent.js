@@ -1,185 +1,171 @@
-define(['backbone', './SelectComponent','./SelectPosition'],
-	function(Backbone, SelectComponent, SelectPosition) {
-		/**
-		 * @class MoveComponent
-		 * */
-		return _.extend({},SelectComponent, SelectPosition,{
+import { extend, bindAll } from 'underscore';
+import Backbone from 'backbone';
+import { on, off } from 'utils/mixins';
+import SelectComponent from './SelectComponent';
+import SelectPosition from './SelectPosition';
 
-			init: function(o){
-				SelectComponent.init.apply(this, arguments);
-				_.bindAll(this,'startMove','onMove','endMove','rollback','selectingPosition','itemLeft');
-				this.opt	= o;
-				this.hoverClass	= this.pfx + 'hover-move';
-				this.badgeClass	= this.pfx + 'badge-yellow';
-				this.noSelClass	= this.pfx + 'no-select';
-			},
+const $ = Backbone.$;
 
-			enable: function(){
-				this.canvasTop 	= this.$canvas.offset().top;
-				this.canvasLeft	= this.$canvas.offset().left;
-				this.$el.css('cursor','move');
-				this.$el.on('mousedown', this.startMove);
-				this.startSelectComponent();
+export default extend({}, SelectPosition, SelectComponent, {
+  init(o) {
+    SelectComponent.init.apply(this, arguments);
+    bindAll(this, 'initSorter', 'rollback', 'onEndMove');
+    this.opt = o;
+    this.hoverClass = this.ppfx + 'highlighter-warning';
+    this.badgeClass = this.ppfx + 'badge-warning';
+    this.noSelClass = this.ppfx + 'no-select';
+  },
 
-				//Avoid strange moving behavior
-				this.$el.addClass(this.noSelClass);
-			},
+  enable(...args) {
+    SelectComponent.enable.apply(this, args);
+    this.getBadgeEl().addClass(this.badgeClass);
+    this.getHighlighterEl().addClass(this.hoverClass);
+    var wp = this.$wrapper;
+    wp.css('cursor', 'move');
+    wp.on('mousedown', this.initSorter);
 
-			/**
-			 * Hover command
-			 * @param {Object}	e
-			 */
-			onHover: function(e)
-			{
-				e.stopPropagation();
+    // Avoid strange moving behavior
+    wp.addClass(this.noSelClass);
+  },
 
-			  var $this 	= $(e.target);
-			  if($this.data('model').get('movable')){							//Show badge if possible
-					 $this.addClass(this.hoverClass);
-					 this.attachBadge(e.target);
-			    }
-			},
+  /**
+   * Overwrite for doing nothing
+   * @private
+   */
+  toggleClipboard() {},
 
-			/** Say what to do after the component was selected
-			 * 	- Method from selectComponent
-			 * @param Event
-			 * @param Object Selected element
-			 * */
-			onSelect: function(e,el){},
+  /**
+   * Delegate sorting
+   * @param  {Event} e
+   * @private
+   * */
+  initSorter(e) {
+    var el = $(e.target).data('model');
+    var drag = el.get('draggable');
+    if (!drag) return;
 
-			/** Picking component to move
-			 * @param event
-			 * */
-			startMove: function(e, el){
-				this.moved = false;
-				if( !$(e.target).data('model').get('movable') ){  return; }					//In case the component selected is not movable
-				this.$el.off('mousedown', this.startMove);
-				this.stopSelectComponent(e);
-				this.$selectedEl = $(e.target);
-				this.freezeComponent(this.$selectedEl);
-				this.helperObj =  $('<div>', {class: "tempComp"}).css({ 					//HELPER gray box
-					top : (e.pageY - this.canvasTop) + this.$canvas.scrollTop(),
-					left: (e.pageX - this.canvasLeft) + this.$canvas.scrollLeft(),
-					width: $(e.target).width(),
-					height: $(e.target).height(),
-					position : 'absolute',
-					'pointer-events': 'none',							//disable events for the element
-				}).data('helper',1).appendTo(this.$el);
+    // Avoid badge showing on move
+    this.cacheEl = null;
+    this.startSelectPosition(e.target, this.frameEl.contentDocument);
+    this.sorter.draggable = drag;
+    this.sorter.onEndMove = this.onEndMove.bind(this);
+    this.stopSelectComponent();
+    this.$wrapper.off('mousedown', this.initSorter);
+    on(this.getContentWindow(), 'keydown', this.rollback);
+  },
 
-				this.startSelectPosition();
+  /**
+   * Init sorter from model
+   * @param  {Object} model
+   * @private
+   */
+  initSorterFromModel(model) {
+    var drag = model.get('draggable');
+    if (!drag) return;
+    // Avoid badge showing on move
+    this.cacheEl = null;
+    var el = model.view.el;
+    this.startSelectPosition(el, this.frameEl.contentDocument);
+    this.sorter.draggable = drag;
+    this.sorter.onEndMove = this.onEndMoveFromModel.bind(this);
 
-				this.$el.on('mousemove',this.onMove);
-				$(document).on('mouseup',this.endMove);
-				$(document).on('keypress',this.rollback);
-			},
+    /*
+    this.sorter.setDragHelper(el);
+    var dragHelper = this.sorter.dragHelper;
+    dragHelper.className = this.ppfx + 'drag-helper';
+    dragHelper.innerHTML = '';
+    dragHelper.backgroundColor = 'white';
+    */
 
-			/** During move
-			 * @param event */
-			onMove: function(e){
-				this.moved = true;
-				var relativeY = (e.pageY - this.canvasTop) + this.$canvas.scrollTop();
-				var relativeX = (e.pageX - this.canvasLeft) + this.$canvas.scrollLeft();
-				this.helperObj[0].style.top = (relativeY)+'px';
-				this.helperObj[0].style.left = (relativeX)+'px';
-			},
+    this.stopSelectComponent();
+    on(this.getContentWindow(), 'keydown', this.rollback);
+  },
 
-			/** Leave component
-			 * @param event */
-			endMove: function(e){
-				this.$el.off('mousemove',this.onMove);
-				$(document).off('mouseup', this.endMove);
-				$(document).off('keypress', this.rollback);
-				this.helperObj.remove();
+  /**
+   * Init sorter from models
+   * @param  {Object} model
+   * @private
+   */
+  initSorterFromModels(models) {
+    // TODO: if one only check for `draggable`
+    // Avoid badge showing on move
+    this.cacheEl = null;
+    const lastModel = models[models.length - 1];
+    const frame = (this.em.get('currentFrame') || {}).model;
+    const el = lastModel.getEl(frame);
+    const doc = el.ownerDocument;
+    this.startSelectPosition(el, doc, { onStart: this.onStart });
+    this.sorter.draggable = lastModel.get('draggable');
+    this.sorter.toMove = models;
+    this.sorter.onMoveClb = this.onDrag;
+    this.sorter.onEndMove = this.onEndMoveFromModel.bind(this);
+    this.stopSelectComponent();
+    on(this.getContentWindow(), 'keydown', this.rollback);
+  },
 
-				this.removePositionPlaceholder();
-				this.stopSelectPosition();
+  onEndMoveFromModel() {
+    off(this.getContentWindow(), 'keydown', this.rollback);
+  },
 
-				//this.highlightComponent(e,el) after end of move
-				if(this.moved)
-					this.move(null, this.$selectedEl, this.posIndex, this.posMethod);
-				this.unfreezeComponent(this.$selectedEl);
-				this.enable();
-			},
+  /**
+   * Callback after sorting
+   * @private
+   */
+  onEndMove() {
+    this.enable();
+    off(this.getContentWindow(), 'keydown', this.rollback);
+  },
 
-			/** Move component to new position
-			 * @param object Component to move
-			 * @param object Target component
-			 * @param int Indicates the position inside the collection
-			 * @param string Before of after component
-			 *
-			 * @return void
-			 * */
-			move: function(target, el, posIndex, posMethod){
-				var index = posIndex || 0;
-				var model = el.data("model");
-				var collection = model.collection;
+  /**
+   * Say what to do after the component was selected (selectComponent)
+   * @param {Event} e
+   * @param {Object} Selected element
+   * @private
+   * */
+  onSelect(e, el) {},
 
-				var targetCollection 	= this.posTargetCollection;
-				var targetModel 		= this.posTargetModel;
+  /**
+   * Used to bring the previous situation before start moving the component
+   * @param {Event} e
+   * @param {Boolean} Indicates if rollback in anycase
+   * @private
+   * */
+  rollback(e, force) {
+    var key = e.which || e.keyCode;
+    if (key == 27 || force) {
+      this.sorter.moved = false;
+      this.sorter.endMove();
+    }
+    return;
+  },
 
-				if(targetCollection && targetModel.get('droppable')){
-					var modelTemp = targetCollection.add({css:{}}, { at: index });
-					var modelRemoved = collection.remove(model);
-					targetCollection.add(modelRemoved, { at: index });
-					targetCollection.remove(modelTemp);//{ avoidStore: 1 }
-				}else
-					console.warn("Invalid target position");
-			},
+  /**
+   * Returns badge element
+   * @return {HTMLElement}
+   * @private
+   */
+  getBadgeEl() {
+    if (!this.$badge) this.$badge = $(this.getBadge());
+    return this.$badge;
+  },
 
-			/** Make component untouchable
-			 * @param object Component
-			 * @return void
-			 * */
-			freezeComponent: function($component){
-				$component.css({'pointer-events':'none'});
-				$component.addClass('freezed');
-			},
+  /**
+   * Returns highlighter element
+   * @return {HTMLElement}
+   * @private
+   */
+  getHighlighterEl() {
+    if (!this.$hl) this.$hl = $(this.canvas.getHighlighter());
+    return this.$hl;
+  },
 
-			/** Make component touchable
-			 * @param object Component
-			 * @return void
-			 * */
-			unfreezeComponent: function($component){
-				$component.css({'pointer-events':'auto'});
-				$component.removeClass('freezed');
-			},
-
-			/** Used to bring the previous situation before start moving the component
-			 * @param Event
-			 * @param Bool Indicates if rollback in anycase
-			 * @return void
-			 * */
-			rollback: function(e, force){
-				var key = e.which || e.keyCode;
-				if(key == this.opt.ESCAPE_KEY || force){
-					this.moved = false;
-					this.endMove();
-				}
-				return;
-			},
-
-			/** Closing method
-			 * */
-			last: function(){
-				this.placeholder.remove();
-				this.placeholderStart.remove();
-				this.helperObj.remove();
-				this.$el.off('mousemove',this.move);
-				$(document).off('mouseup', this.endMove);
-				$(document).off('keypress', this.rollback);
-			},
-
-			/* Run method */
-			run: function(){
-				this.enable();
-			},
-
-			/* Stop method */
-			stop: function(){
-				this.stopSelectComponent();
-				this.$el.css('cursor','');//changes back aspect of the cursor
-				this.$el.unbind();//removes all attached events
-				this.$el.removeClass(this.noSelClass);
-			}
-		});
-	});
+  stop(...args) {
+    SelectComponent.stop.apply(this, args);
+    this.getBadgeEl().removeClass(this.badgeClass);
+    this.getHighlighterEl().removeClass(this.hoverClass);
+    var wp = this.$wrapper;
+    wp.css('cursor', '')
+      .unbind()
+      .removeClass(this.noSelClass);
+  }
+});

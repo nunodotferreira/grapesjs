@@ -1,11 +1,6 @@
-define([ 'backbone','./Panel'], 
-	function (Backbone, Panel) {
-		/**
-		 * @class Panels
-		 * */
-		return Backbone.Collection.extend({
-			
-			model: Panel,
-			
-		});
+import Backbone from 'backbone';
+import Panel from './Panel';
+
+export default Backbone.Collection.extend({
+  model: Panel
 });
